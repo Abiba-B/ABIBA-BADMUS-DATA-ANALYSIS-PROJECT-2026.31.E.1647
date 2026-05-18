@@ -1,0 +1,723 @@
+---
+title: "Crude Oil Production and Evacuation Analytics: Drivers of Zone-Level Throughput Performance"
+author: "Abiba Badmus — 2026/31/E/1647"
+date: today
+format:
+  html:
+    theme: flatly
+    toc: true
+    toc-depth: 3
+    code-fold: true
+    self-contained: true
+execute:
+  warning: false
+  message: false
+---
+
+```{r setup, include=FALSE}
+# ── R libraries ──────────────────────────────────────────────────────────────
+pkgs <- c("tidyverse", "lubridate", "scales", "ggcorrplot",
+          "patchwork", "car", "broom", "knitr", "kableExtra")
+invisible(lapply(pkgs, library, character.only = TRUE))
+
+knitr::opts_chunk$set(fig.width = 9, fig.height = 5, dpi = 150)
+```
+
+```{python setup-py, include=FALSE}
+# ── Python libraries ──────────────────────────────────────────────────────────
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.ticker as mticker
+import seaborn as sns
+from scipy import stats
+import statsmodels.formula.api as smf
+import statsmodels.api as sm
+from IPython.display import display
+
+sns.set_theme(style="whitegrid", palette="muted")
+plt.rcParams["figure.dpi"] = 150
+```
+
+```{r load-r, include=FALSE}
+# ── R: Load and clean data ───────────────────────────────────────────────────
+parse_num <- function(x) as.numeric(gsub("[^0-9.]", "", trimws(x)))
+
+prod_r <- read_csv("data/daily production report.csv",
+                   col_types = cols(.default = col_character())) |>
+  mutate(
+    DATE       = dmy(DATE),
+    BUDGET     = parse_num(BUDGET),
+    ACTUAL     = ifelse(trimws(ACTUAL) %in% c("-", "--", "  -   ", ""), "0", ACTUAL),
+    ACTUAL     = parse_num(ACTUAL),
+    ZONE       = trimws(ZONE),
+    FLOW_STATIONS = trimws(FLOW_STATIONS),
+    shortfall  = ACTUAL - BUDGET
+  )
+
+evac_r <- read_csv("data/evacuation_report.csv",
+                   col_types = cols(.default = col_character())) |>
+  mutate(
+    DATE                  = dmy(DATE),
+    evacuation_capacity   = parse_num(evacuation_capacity),
+    evacuation_utilization = parse_num(evacuation_utilization),
+    ZONE                  = trimws(ZONE),
+    utilization_rate      = evacuation_utilization / evacuation_capacity
+  )
+
+# Zone-level aggregated production
+prod_zone_r <- prod_r |>
+  group_by(DATE, ZONE) |>
+  summarise(BUDGET_zone   = sum(BUDGET,    na.rm = TRUE),
+            ACTUAL_zone   = sum(ACTUAL,    na.rm = TRUE),
+            shortfall_zone = sum(shortfall, na.rm = TRUE),
+            .groups = "drop")
+
+# Master joined dataset
+df_r <- prod_zone_r |>
+  left_join(evac_r, by = c("DATE", "ZONE")) |>
+  mutate(period = case_when(
+    month(DATE) <= 2 ~ "Jan-Feb",
+    month(DATE) <= 4 ~ "Mar-Apr",
+    TRUE             ~ "May+"
+  ))
+```
+
+```{python load-py, include=FALSE}
+# ── Python: Load and clean data ──────────────────────────────────────────────
+def parse_num(s):
+    return pd.to_numeric(
+        s.astype(str).str.strip().str.replace(r"[^\d.]", "", regex=True),
+        errors="coerce"
+    )
+
+prod_py = pd.read_csv("data/daily production report.csv", dtype=str)
+prod_py["DATE"]          = pd.to_datetime(prod_py["DATE"].str.strip(), dayfirst=True)
+prod_py["BUDGET"]        = parse_num(prod_py["BUDGET"])
+prod_py["ACTUAL"]        = prod_py["ACTUAL"].str.strip().replace({"-": "0", "  -   ": "0", "": "0"})
+prod_py["ACTUAL"]        = parse_num(prod_py["ACTUAL"]).fillna(0)
+prod_py["ZONE"]          = prod_py["ZONE"].str.strip()
+prod_py["FLOW_STATIONS"] = prod_py["FLOW_STATIONS"].str.strip()
+prod_py["shortfall"]     = prod_py["ACTUAL"] - prod_py["BUDGET"]
+
+evac_py = pd.read_csv("data/evacuation_report.csv", dtype=str)
+evac_py["DATE"]                   = pd.to_datetime(evac_py["DATE"].str.strip(), dayfirst=True)
+evac_py["evacuation_capacity"]    = parse_num(evac_py["evacuation_capacity"])
+evac_py["evacuation_utilization"] = parse_num(evac_py["evacuation_utilization"])
+evac_py["ZONE"]                   = evac_py["ZONE"].str.strip()
+evac_py["utilization_rate"]       = evac_py["evacuation_utilization"] / evac_py["evacuation_capacity"]
+
+prod_zone_py = prod_py.groupby(["DATE", "ZONE"]).agg(
+    BUDGET_zone=("BUDGET", "sum"),
+    ACTUAL_zone=("ACTUAL", "sum"),
+    shortfall_zone=("shortfall", "sum")
+).reset_index()
+
+df_py = prod_zone_py.merge(evac_py, on=["DATE", "ZONE"], how="left")
+```
+
+---
+
+## 1. Executive Summary
+
+> **Instructions:** Write 150–200 words after completing your analysis. Use the structure below.
+
+**Business problem:** [Briefly describe the production shortfall challenge and its strategic consequences — OPEC targets, 2026 national benchmark, your personal 18M-barrel evacuation target.]
+
+**Data collected:** Daily production and evacuation records extracted from the upstream operations tracking system covering January 1 to May 5, 2026 — 625 station-level production records and 250 zone-level evacuation records.
+
+**Key findings:**
+
+1. [Zone X] shows a statistically significant average shortfall of [Y bbl/day] against budget (p = [value]).
+2. Evacuation utilization rate is [positively/negatively] correlated with production attainment (r = [value], p = [value]).
+3. [Top regression driver] explains the most variance in daily shortfall; each one-unit increase is associated with a [Z bbl] change in output.
+
+**Recommendation:** [One quantified operational recommendation based on your regression results.]
+
+---
+
+## 2. Professional Disclosure
+
+> **Instructions:** Paste your completed Section 2 from `docs/section_a_30_marks_template.md` here.
+
+---
+
+## 3. Data Collection & Sampling
+
+> **Instructions:** Paste your completed Section 3 from `docs/section_a_30_marks_template.md` here.
+
+---
+
+## 4. Data Description
+
+::: {.panel-tabset}
+
+## R
+
+```{r eda-describe-r}
+# Dataset dimensions
+cat("Production records:", nrow(prod_r), "rows |", ncol(prod_r), "columns\n")
+cat("Evacuation records:", nrow(evac_r), "rows |", ncol(evac_r), "columns\n")
+cat("Merged zone dataset:", nrow(df_r), "rows\n\n")
+
+# Summary statistics for key numeric variables
+prod_r |>
+  select(BUDGET, ACTUAL, shortfall) |>
+  summary() |>
+  kable(caption = "Production dataset — key numeric summaries") |>
+  kable_styling(bootstrap_options = "striped", full_width = FALSE)
+```
+
+```{r missing-r}
+# Missing value audit
+prod_r |>
+  summarise(across(everything(), ~ sum(is.na(.)))) |>
+  pivot_longer(everything(), names_to = "Column", values_to = "NA_count") |>
+  filter(NA_count > 0) |>
+  kable(caption = "Missing values in production dataset") |>
+  kable_styling(full_width = FALSE)
+
+cat("\nNote: ACTUAL = 0 records (non-operational days):",
+    sum(prod_r$ACTUAL == 0), "\n")
+
+# Record counts by zone and station
+prod_r |>
+  count(ZONE, FLOW_STATIONS) |>
+  kable(caption = "Record counts by Zone and Flow Station") |>
+  kable_styling(full_width = FALSE)
+```
+
+## Python
+
+```{python eda-describe-py}
+print(f"Production records: {prod_py.shape[0]} rows | {prod_py.shape[1]} columns")
+print(f"Evacuation records: {evac_py.shape[0]} rows | {evac_py.shape[1]} columns")
+print(f"Merged zone dataset: {df_py.shape[0]} rows\n")
+
+display(prod_py[["BUDGET", "ACTUAL", "shortfall"]].describe().round(2))
+```
+
+```{python missing-py}
+na_counts = prod_py.isnull().sum()
+na_counts = na_counts[na_counts > 0]
+if len(na_counts):
+    print("Missing values:\n", na_counts)
+else:
+    print("No missing values after cleaning.\n")
+
+print(f"ACTUAL = 0 records (non-operational days): {(prod_py['ACTUAL'] == 0).sum()}")
+print("\nRecord counts by Zone and Flow Station:")
+display(prod_py.groupby(["ZONE", "FLOW_STATIONS"]).size().reset_index(name="count"))
+```
+
+:::
+
+---
+
+## 5. Technique 1 — Exploratory Data Analysis
+
+**Business justification:** Before any inferential test, this section establishes the shape of the production shortfall distribution, identifies extreme outlier days, and reveals how performance varies across zones and flow stations. These findings directly inform which statistical tests are appropriate in later sections.
+
+::: {.panel-tabset}
+
+## R
+
+```{r eda-r}
+# Distribution of shortfall by zone
+p1 <- ggplot(prod_r, aes(x = shortfall, fill = ZONE)) +
+  geom_histogram(bins = 40, alpha = 0.7, position = "identity") +
+  geom_vline(xintercept = 0, linetype = "dashed", colour = "red") +
+  facet_wrap(~ZONE, ncol = 1) +
+  scale_x_continuous(labels = comma) +
+  labs(title = "Distribution of Daily Production Shortfall by Zone",
+       subtitle = "Red line = on-target (shortfall = 0). Left of line = underperformance.",
+       x = "Shortfall (bbl/day)", y = "Count") +
+  theme_minimal(base_size = 11) +
+  theme(legend.position = "none")
+
+# Box plot: shortfall by flow station
+p2 <- ggplot(prod_r, aes(x = FLOW_STATIONS, y = shortfall, fill = ZONE)) +
+  geom_boxplot(alpha = 0.7, outlier.colour = "red", outlier.size = 1.5) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  scale_y_continuous(labels = comma) +
+  labs(title = "Shortfall Distribution by Flow Station",
+       x = "Flow Station", y = "Shortfall (bbl/day)") +
+  theme_minimal(base_size = 11)
+
+p1 / p2
+```
+
+```{r eda-summary-r}
+# Summary statistics by zone and station
+prod_r |>
+  group_by(ZONE, FLOW_STATIONS) |>
+  summarise(
+    n             = n(),
+    mean_budget   = mean(BUDGET,    na.rm = TRUE),
+    mean_actual   = mean(ACTUAL,    na.rm = TRUE),
+    mean_shortfall = mean(shortfall, na.rm = TRUE),
+    pct_days_under = mean(shortfall < 0) * 100,
+    .groups = "drop"
+  ) |>
+  mutate(across(where(is.numeric), ~ round(., 1))) |>
+  kable(caption = "EDA Summary: mean daily production and shortfall by zone and station",
+        col.names = c("Zone","Station","n","Avg Budget","Avg Actual","Avg Shortfall","% Days Under Budget")) |>
+  kable_styling(bootstrap_options = "striped", full_width = FALSE)
+```
+
+## Python
+
+```{python eda-py}
+fig, axes = plt.subplots(1, 2, figsize=(12, 4))
+
+for ax, zone in zip(axes, prod_py["ZONE"].unique()):
+    subset = prod_py[prod_py["ZONE"] == zone]["shortfall"]
+    ax.hist(subset, bins=40, alpha=0.7, edgecolor="white")
+    ax.axvline(0, color="red", linestyle="--", label="On-target")
+    ax.set_title(f"Shortfall Distribution — {zone}")
+    ax.set_xlabel("Shortfall (bbl/day)")
+    ax.set_ylabel("Count")
+    ax.legend()
+
+plt.suptitle("Daily Production Shortfall by Zone", fontsize=12, fontweight="bold")
+plt.tight_layout()
+plt.show()
+```
+
+```{python eda-summary-py}
+summary = prod_py.groupby(["ZONE", "FLOW_STATIONS"]).agg(
+    n=("shortfall", "count"),
+    mean_budget=("BUDGET", "mean"),
+    mean_actual=("ACTUAL", "mean"),
+    mean_shortfall=("shortfall", "mean"),
+    pct_days_under=("shortfall", lambda x: (x < 0).mean() * 100)
+).round(1).reset_index()
+display(summary)
+```
+
+:::
+
+> **Interpretation (write here after running):** Describe the shape of the shortfall distribution — is it symmetric or skewed? Which zone/station shows the most days under budget? What does this tell you about operational reliability?
+
+---
+
+## 6. Technique 2 — Data Visualization
+
+**Business justification:** Time-series and comparative charts communicate throughput trends and zone performance to management in the format used in board briefings. The merged dataset enables visualizing how evacuation capacity tracks alongside production attainment.
+
+::: {.panel-tabset}
+
+## R
+
+```{r viz-timeseries-r}
+# Time series: zone-level ACTUAL vs BUDGET
+ggplot(df_r, aes(x = DATE)) +
+  geom_line(aes(y = ACTUAL_zone, colour = "Actual"),  linewidth = 0.8) +
+  geom_line(aes(y = BUDGET_zone, colour = "Budget"), linetype = "dashed", linewidth = 0.8) +
+  facet_wrap(~ZONE, ncol = 1, scales = "free_y") +
+  scale_y_continuous(labels = comma) +
+  scale_colour_manual(values = c("Actual" = "#2c7bb6", "Budget" = "#d7191c")) +
+  labs(title    = "Daily Production: Actual vs Budget by Zone",
+       subtitle = "Jan–May 2026",
+       x = "Date", y = "Production (bbl/day)", colour = NULL) +
+  theme_minimal(base_size = 11) +
+  theme(legend.position = "bottom")
+```
+
+```{r viz-utilization-r}
+# Evacuation utilization rate over time
+ggplot(evac_r, aes(x = DATE, y = utilization_rate, colour = ZONE)) +
+  geom_line(linewidth = 0.9) +
+  geom_hline(yintercept = 1/1.5, linetype = "dashed", colour = "orange",
+             linewidth = 0.8) +
+  annotate("text", x = min(evac_r$DATE) + 5, y = 1/1.5 + 0.01,
+           label = "Min 150% capacity threshold (66.7% utilization)", hjust = 0, size = 3) +
+  scale_y_continuous(labels = percent_format()) +
+  labs(title   = "Evacuation Utilization Rate by Zone",
+       x = "Date", y = "Utilization Rate (util / capacity)", colour = "Zone") +
+  theme_minimal(base_size = 11)
+```
+
+```{r viz-heatmap-r}
+# Heatmap: average shortfall by station and month
+prod_r |>
+  mutate(month_label = format(DATE, "%b %Y")) |>
+  group_by(FLOW_STATIONS, month_label) |>
+  summarise(avg_shortfall = mean(shortfall, na.rm = TRUE), .groups = "drop") |>
+  ggplot(aes(x = month_label, y = FLOW_STATIONS, fill = avg_shortfall)) +
+  geom_tile(colour = "white") +
+  scale_fill_gradient2(low = "#d73027", mid = "white", high = "#1a9850",
+                       midpoint = 0, labels = comma,
+                       name = "Avg Shortfall") +
+  labs(title = "Average Daily Shortfall Heatmap by Station and Month",
+       x = "Month", y = "Flow Station") +
+  theme_minimal(base_size = 11)
+```
+
+## Python
+
+```{python viz-timeseries-py}
+fig, axes = plt.subplots(2, 1, figsize=(12, 7), sharex=True)
+
+for ax, zone in zip(axes, df_py["ZONE"].unique()):
+    z = df_py[df_py["ZONE"] == zone].sort_values("DATE")
+    ax.plot(z["DATE"], z["ACTUAL_zone"], label="Actual", color="#2c7bb6", linewidth=1.2)
+    ax.plot(z["DATE"], z["BUDGET_zone"], label="Budget", color="#d7191c",
+            linestyle="--", linewidth=1.2)
+    ax.set_title(f"Actual vs Budget — {zone}")
+    ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda x, _: f"{x:,.0f}"))
+    ax.legend()
+
+plt.xlabel("Date")
+fig.suptitle("Daily Production: Actual vs Budget by Zone (Jan–May 2026)",
+             fontsize=12, fontweight="bold")
+plt.tight_layout()
+plt.show()
+```
+
+```{python viz-utilization-py}
+fig, ax = plt.subplots(figsize=(12, 4))
+for zone, grp in evac_py.groupby("ZONE"):
+    grp = grp.sort_values("DATE")
+    ax.plot(grp["DATE"], grp["utilization_rate"], label=zone, linewidth=1.2)
+
+ax.axhline(1/1.5, color="orange", linestyle="--", linewidth=1.2,
+           label="Min 150% capacity threshold (66.7% util)")
+ax.yaxis.set_major_formatter(mticker.PercentFormatter(xmax=1))
+ax.set_title("Evacuation Utilization Rate by Zone")
+ax.set_xlabel("Date")
+ax.set_ylabel("Utilization Rate")
+ax.legend()
+plt.tight_layout()
+plt.show()
+```
+
+```{python viz-heatmap-py}
+heat = prod_py.copy()
+heat["month_label"] = heat["DATE"].dt.to_period("M").astype(str)
+pivot = heat.groupby(["FLOW_STATIONS", "month_label"])["shortfall"].mean().unstack()
+
+fig, ax = plt.subplots(figsize=(9, 4))
+sns.heatmap(pivot, cmap="RdYlGn", center=0, annot=True, fmt=".0f",
+            linewidths=0.5, ax=ax, cbar_kws={"label": "Avg Shortfall (bbl/day)"})
+ax.set_title("Average Daily Shortfall Heatmap by Station and Month")
+ax.set_xlabel("Month")
+ax.set_ylabel("Flow Station")
+plt.tight_layout()
+plt.show()
+```
+
+:::
+
+> **Interpretation (write here after running):** Identify the months with the deepest shortfalls. Comment on whether utilization stays above or below the 150% threshold. Point out the single most important visual finding for management.
+
+---
+
+## 7. Technique 3 — Hypothesis Testing
+
+**Business justification:** Formally tests whether Zone 1 and Zone 2 perform statistically differently against their respective budget targets — converting an operational observation into a statistically defensible basis for resource allocation decisions.
+
+::: {.panel-tabset}
+
+## R
+
+```{r hyp-r}
+# ── Test 1: One-way ANOVA — shortfall across zones ───────────────────────────
+aov_zone <- aov(shortfall ~ ZONE, data = prod_r)
+cat("=== ANOVA: Shortfall by Zone ===\n")
+summary(aov_zone)
+
+# Effect size (eta-squared)
+aov_tidy <- tidy(aov_zone)
+eta_sq <- aov_tidy$sumsq[1] / sum(aov_tidy$sumsq)
+cat(sprintf("\nEta-squared (effect size): %.4f\n", eta_sq))
+cat("Interpretation: ", ifelse(eta_sq < 0.01, "negligible",
+    ifelse(eta_sq < 0.06, "small",
+    ifelse(eta_sq < 0.14, "medium", "large"))), " effect\n\n")
+
+# ── Test 2: ANOVA — shortfall across all four flow stations ─────────────────
+aov_station <- aov(shortfall ~ FLOW_STATIONS, data = prod_r)
+cat("=== ANOVA: Shortfall by Flow Station ===\n")
+summary(aov_station)
+
+# Tukey HSD post-hoc if significant
+tukey <- TukeyHSD(aov_station)
+tidy(tukey) |>
+  arrange(adj.p.value) |>
+  kable(digits = 4, caption = "Tukey HSD post-hoc: pairwise station comparisons") |>
+  kable_styling(bootstrap_options = "striped", full_width = FALSE)
+```
+
+```{r hyp-assumptions-r}
+# Normality check
+shapiro_z1 <- shapiro.test(prod_r$shortfall[prod_r$ZONE == unique(prod_r$ZONE)[1]])
+shapiro_z2 <- shapiro.test(prod_r$shortfall[prod_r$ZONE == unique(prod_r$ZONE)[2]])
+cat("Shapiro-Wilk normality test:\n")
+cat(sprintf("  Zone 1: W=%.4f, p=%.4f\n", shapiro_z1$statistic, shapiro_z1$p.value))
+cat(sprintf("  Zone 2: W=%.4f, p=%.4f\n", shapiro_z2$statistic, shapiro_z2$p.value))
+
+# If normality violated, run non-parametric Kruskal-Wallis
+kw <- kruskal.test(shortfall ~ ZONE, data = prod_r)
+cat(sprintf("\nKruskal-Wallis (non-parametric): chi-sq=%.4f, df=%d, p=%.4f\n",
+            kw$statistic, kw$parameter, kw$p.value))
+```
+
+## Python
+
+```{python hyp-py}
+from scipy.stats import f_oneway, kruskal, shapiro, tukey_hsd
+
+zones = prod_py["ZONE"].unique()
+groups = [prod_py[prod_py["ZONE"] == z]["shortfall"].dropna().values for z in zones]
+
+# ANOVA
+f_stat, p_anova = f_oneway(*groups)
+print(f"=== One-way ANOVA: Shortfall by Zone ===")
+print(f"F = {f_stat:.4f}, p = {p_anova:.4f}")
+print("Result:", "Significant difference" if p_anova < 0.05 else "No significant difference",
+      "at 5% level\n")
+
+# Kruskal-Wallis (non-parametric robustness check)
+h_stat, p_kw = kruskal(*groups)
+print(f"=== Kruskal-Wallis (non-parametric): ===")
+print(f"H = {h_stat:.4f}, p = {p_kw:.4f}\n")
+
+# Normality check
+print("=== Shapiro-Wilk Normality Test ===")
+for z, g in zip(zones, groups):
+    stat, p = shapiro(g[:5000])  # Shapiro limited to 5000 samples
+    print(f"  {z}: W={stat:.4f}, p={p:.4f}")
+```
+
+```{python hyp-station-py}
+stations = prod_py["FLOW_STATIONS"].unique()
+station_groups = [prod_py[prod_py["FLOW_STATIONS"] == s]["shortfall"].dropna().values
+                  for s in stations]
+
+f_stat2, p_aov2 = f_oneway(*station_groups)
+print(f"\n=== ANOVA: Shortfall by Flow Station ===")
+print(f"F = {f_stat2:.4f}, p = {p_aov2:.4f}")
+
+# Tukey HSD post-hoc
+from statsmodels.stats.multicomp import pairwise_tukeyhsd
+tukey_result = pairwise_tukeyhsd(
+    endog=prod_py["shortfall"].dropna(),
+    groups=prod_py.loc[prod_py["shortfall"].notna(), "FLOW_STATIONS"]
+)
+print(tukey_result.summary())
+```
+
+:::
+
+> **Interpretation (write here after running):** State your H₀ and H₁ explicitly. Report the F-statistic, p-value, and effect size. Translate the result into a plain business statement: e.g., "Zone 2 produces a statistically significant average shortfall of X bbl/day compared with Zone 1 (p = 0.02), justifying priority re-scheduling of evacuation capacity."
+
+---
+
+## 8. Technique 4 — Correlation Analysis
+
+**Business justification:** Maps the relationships between budget targets, actual production, evacuation capacity, and utilization before building the regression model. Identifies which evacuation variables have genuine independent predictive value.
+
+::: {.panel-tabset}
+
+## R
+
+```{r corr-r}
+# Correlation matrix on merged zone dataset
+corr_vars <- df_r |>
+  select(BUDGET_zone, ACTUAL_zone, shortfall_zone,
+         evacuation_capacity, evacuation_utilization, utilization_rate) |>
+  drop_na()
+
+cor_matrix <- cor(corr_vars, method = "pearson")
+
+ggcorrplot(cor_matrix,
+           method   = "circle",
+           type     = "lower",
+           lab      = TRUE,
+           lab_size = 3.5,
+           colors   = c("#d73027", "white", "#1a9850"),
+           title    = "Pearson Correlation Matrix — Production and Evacuation Variables",
+           ggtheme  = theme_minimal(base_size = 11))
+```
+
+```{r corr-table-r}
+# Top correlations with shortfall
+cor_tbl <- as.data.frame(cor_matrix) |>
+  rownames_to_column("Variable") |>
+  select(Variable, shortfall_zone) |>
+  filter(Variable != "shortfall_zone") |>
+  arrange(desc(abs(shortfall_zone))) |>
+  rename(Correlation_with_Shortfall = shortfall_zone)
+
+kable(cor_tbl, digits = 4,
+      caption = "Correlation of each variable with daily zone-level shortfall") |>
+  kable_styling(bootstrap_options = "striped", full_width = FALSE)
+```
+
+## Python
+
+```{python corr-py}
+corr_cols = ["BUDGET_zone", "ACTUAL_zone", "shortfall_zone",
+             "evacuation_capacity", "evacuation_utilization", "utilization_rate"]
+corr_data = df_py[corr_cols].dropna()
+cor_mat = corr_data.corr(method="pearson")
+
+fig, ax = plt.subplots(figsize=(8, 6))
+mask = np.triu(np.ones_like(cor_mat, dtype=bool))
+sns.heatmap(cor_mat, mask=mask, annot=True, fmt=".3f", cmap="RdYlGn",
+            center=0, vmin=-1, vmax=1,
+            linewidths=0.5, ax=ax,
+            cbar_kws={"shrink": 0.8})
+ax.set_title("Pearson Correlation Matrix — Production & Evacuation Variables",
+             fontsize=11, fontweight="bold")
+plt.tight_layout()
+plt.show()
+```
+
+```{python corr-table-py}
+shortfall_corr = cor_mat["shortfall_zone"].drop("shortfall_zone").sort_values(
+    key=abs, ascending=False
+)
+print("Correlation with shortfall_zone:\n")
+print(shortfall_corr.round(4).to_string())
+```
+
+:::
+
+> **Interpretation (write here after running):** Identify the 2–3 strongest correlations. For each, explain the business meaning: e.g., "High positive correlation between evacuation_utilization and ACTUAL_zone (r = 0.72) suggests that when more evacuation throughput is achieved, actual production attainment is higher — consistent with the hypothesis that evacuation capacity constrains output."
+
+---
+
+## 9. Technique 5 — Multiple Regression
+
+**Business justification:** Quantifies the independent contribution of zone, evacuation capacity, and utilization to daily production shortfall. The resulting coefficients support concrete fleet-sizing and capacity-allocation recommendations.
+
+::: {.panel-tabset}
+
+## R
+
+```{r reg-r}
+# Encode ZONE as factor
+df_r$ZONE_f <- factor(df_r$ZONE)
+
+# Model: shortfall ~ ZONE + evacuation_capacity + utilization_rate
+model <- lm(shortfall_zone ~ ZONE_f + evacuation_capacity + utilization_rate,
+            data = df_r)
+
+cat("=== Regression: Daily Zone Shortfall ===\n")
+summary(model)
+```
+
+```{r reg-diagnostics-r}
+# Coefficient table
+tidy(model, conf.int = TRUE) |>
+  mutate(across(where(is.numeric), ~ round(., 4))) |>
+  kable(caption = "Regression coefficients with 95% confidence intervals") |>
+  kable_styling(bootstrap_options = "striped", full_width = FALSE)
+
+# Model fit
+glance(model) |>
+  select(r.squared, adj.r.squared, p.value, AIC) |>
+  mutate(across(everything(), ~ round(., 4))) |>
+  kable(caption = "Model fit statistics") |>
+  kable_styling(full_width = FALSE)
+```
+
+```{r reg-plots-r}
+# Diagnostic plots
+par(mfrow = c(2, 2))
+plot(model, which = 1:4, pch = 16, cex = 0.6)
+par(mfrow = c(1, 1))
+```
+
+## Python
+
+```{python reg-py}
+import statsmodels.formula.api as smf
+
+df_reg = df_py.dropna(subset=["shortfall_zone", "evacuation_capacity",
+                               "utilization_rate", "ZONE"])
+
+# Encode ZONE
+df_reg = df_reg.copy()
+df_reg["ZONE_f"] = pd.Categorical(df_reg["ZONE"])
+
+model_py = smf.ols(
+    "shortfall_zone ~ C(ZONE_f) + evacuation_capacity + utilization_rate",
+    data=df_reg
+).fit()
+
+print(model_py.summary())
+```
+
+```{python reg-diagnostics-py}
+# Residual plot
+fig, axes = plt.subplots(1, 2, figsize=(12, 4))
+
+# Residuals vs Fitted
+axes[0].scatter(model_py.fittedvalues, model_py.resid, alpha=0.5, s=15)
+axes[0].axhline(0, color="red", linestyle="--")
+axes[0].set_xlabel("Fitted values")
+axes[0].set_ylabel("Residuals")
+axes[0].set_title("Residuals vs Fitted")
+
+# Q-Q plot
+sm.qqplot(model_py.resid, line="s", ax=axes[1], alpha=0.5)
+axes[1].set_title("Q-Q Plot of Residuals")
+
+plt.tight_layout()
+plt.show()
+
+print(f"\nR-squared: {model_py.rsquared:.4f}")
+print(f"Adj. R-squared: {model_py.rsquared_adj:.4f}")
+print(f"F-statistic p-value: {model_py.f_pvalue:.6f}")
+```
+
+:::
+
+> **Interpretation (write here after running):** For each significant coefficient, write one sentence in plain business language. Example: "A one-unit increase in utilization rate is associated with an increase of [X bbl/day] in actual production, holding zone and capacity constant — confirming that maximizing evacuation throughput directly recovers production volume."
+
+---
+
+## 10. Integrated Findings
+
+> **Instructions:** Write 150–200 words explaining how the five analyses fit together. What single operational recommendation do they collectively support?
+
+The five analyses tell a coherent story about crude oil production performance:
+
+- **EDA** established that [Zone/Station X] accounts for the majority of budget shortfall days, and that non-operational days are concentrated in [describe pattern].
+- **Visualization** confirmed the temporal structure: shortfalls are deepest in [months], and evacuation utilization frequently [exceeds/falls below] the 150% safety threshold.
+- **Hypothesis testing** provided the statistical confirmation: the shortfall difference between Zone 1 and Zone 2 is [significant/not significant] at p = [value].
+- **Correlation analysis** revealed that [utilization rate / evacuation capacity] has the strongest relationship with production attainment (r = [value]).
+- **Regression** quantified the effect: [top variable] explains [X%] of variance in daily shortfall.
+
+**Recommendation:** [One concrete, quantified recommendation supported by the regression coefficient.]
+
+---
+
+## 11. Limitations & Further Work
+
+- The post-March 2026 period has fewer operational days in the dataset (confirm whether partial months exist). Results for seasonal trends should be re-validated with a full year of data.
+- The regression assumes linear relationships between evacuation variables and production shortfall. Threshold effects (e.g., non-linear impact of capacity falling below a critical level) should be explored with polynomial or spline terms.
+- Three of the seven planned flow stations are currently non-functional and excluded from this analysis. A full production performance model should account for planned station reactivation.
+- Future work: incorporate pipeline maintenance event data as an additional predictor to isolate scheduled downtime from structural underperformance.
+
+---
+
+## References
+
+> *(Complete in APA format. Use the template below.)*
+
+- Wickham, H., & Grolemund, G. (2017). *R for Data Science*. O'Reilly Media.
+- McKinney, W. (2022). *Python for Data Analysis* (3rd ed.). O'Reilly Media.
+- [Textbook reference — cite the LBS Data Analytics 1 course textbook here]
+- R Core Team (2024). *R: A language and environment for statistical computing.* `citation()` in R console.
+- Cite each R package: `citation("tidyverse")`, `citation("ggplot2")` etc.
+
+---
+
+## Appendix: AI Usage Statement
+
+> *(Write one paragraph. Example:)*
+
+GitHub Copilot (Microsoft) and ChatGPT (OpenAI) assisted in structuring the Quarto document template and suggesting initial code patterns for data loading and visualization. All analytical decisions — including variable selection, test choice, threshold definitions, and business interpretation — were made independently by the author. Every line of code was reviewed, adapted to the specific dataset, and validated against the output before inclusion.
