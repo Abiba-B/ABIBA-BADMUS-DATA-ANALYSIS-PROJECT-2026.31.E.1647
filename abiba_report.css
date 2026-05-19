@@ -1,0 +1,144 @@
+/* Abiba report: editorial briefing aesthetic */
+:root {
+  --abiba-ink: #20323a;
+  --abiba-accent: #8f5a2a;
+  --abiba-accent-soft: #d6b694;
+  --abiba-surface: #fffdfa;
+  --abiba-paper: #f4efe7;
+  --abiba-border: #d8c8b5;
+  --abiba-muted: #6c6964;
+}
+
+body {
+  background:
+    radial-gradient(circle at top right, rgba(143, 90, 42, 0.08), transparent 26%),
+    linear-gradient(180deg, #f6f1e9 0%, #efe6d8 100%);
+  color: var(--abiba-ink);
+  font-family: Baskerville, "Palatino Linotype", Palatino, "Book Antiqua", serif;
+  line-height: 1.7;
+}
+
+main.content,
+.page-columns {
+  background: transparent;
+}
+
+#quarto-content .content,
+#quarto-document-content {
+  background: rgba(255, 253, 250, 0.96);
+  border: 1px solid var(--abiba-border);
+  border-radius: 18px;
+  box-shadow: 0 18px 45px rgba(63, 45, 28, 0.08);
+  padding: 2rem 2.4rem 2.6rem;
+}
+
+#title-block-header {
+  background: linear-gradient(135deg, rgba(143, 90, 42, 0.14), rgba(255, 253, 250, 0.9));
+  border: 1px solid var(--abiba-border);
+  border-radius: 18px;
+  padding: 1.8rem 2rem;
+  margin-bottom: 1.8rem;
+}
+
+#title-block-header .title {
+  color: #1b2b31;
+  font-family: "Palatino Linotype", Palatino, Baskerville, serif;
+  font-size: 2.15rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+#title-block-header .subtitle,
+#title-block-header .author,
+#title-block-header .date {
+  color: var(--abiba-muted);
+}
+
+h1, h2, h3, h4 {
+  color: #24353c;
+  font-family: "Palatino Linotype", Palatino, Baskerville, serif;
+  letter-spacing: 0.01em;
+}
+
+h2 {
+  border-bottom: 2px solid rgba(143, 90, 42, 0.22);
+  padding-bottom: 0.35rem;
+  margin-top: 2.2rem;
+}
+
+h3 {
+  color: var(--abiba-accent);
+}
+
+p, li, td, th {
+  font-size: 1rem;
+}
+
+a {
+  color: var(--abiba-accent);
+}
+
+.sidebar nav[role="doc-toc"] {
+  background: rgba(255, 250, 244, 0.9);
+  border: 1px solid var(--abiba-border);
+  border-radius: 16px;
+  padding: 1rem 0.9rem;
+}
+
+.sidebar .toc-active,
+.sidebar .active {
+  color: var(--abiba-accent) !important;
+  font-weight: 700;
+}
+
+.callout {
+  border-radius: 14px;
+  border-width: 1px;
+  box-shadow: 0 10px 24px rgba(70, 51, 33, 0.06);
+}
+
+.callout.callout-note {
+  border-left: 6px solid var(--abiba-accent);
+  background: linear-gradient(180deg, rgba(255, 250, 244, 0.95), rgba(247, 239, 230, 0.92));
+}
+
+.table, table {
+  border-collapse: separate;
+  border-spacing: 0;
+  background: var(--abiba-surface);
+}
+
+.table th, table th {
+  background: #efe1cf;
+  color: #23353c;
+  border-bottom: 1px solid var(--abiba-border);
+}
+
+.table td, .table th, table td, table th {
+  border-color: rgba(216, 200, 181, 0.8) !important;
+  padding: 0.7rem 0.8rem;
+}
+
+pre, code {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+}
+
+pre.sourceCode {
+  background: #fbf7f1;
+  border: 1px solid var(--abiba-border);
+  border-radius: 14px;
+}
+
+.quarto-title-meta-heading {
+  color: var(--abiba-accent);
+}
+
+@media (max-width: 991px) {
+  #quarto-content .content,
+  #quarto-document-content,
+  #title-block-header {
+    border-radius: 14px;
+    padding-left: 1.2rem;
+    padding-right: 1.2rem;
+  }
+}

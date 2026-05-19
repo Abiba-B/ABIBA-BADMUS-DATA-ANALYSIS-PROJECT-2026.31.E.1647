@@ -6,11 +6,13 @@ format:
   html:
     theme: flatly
     toc: true
+    toc-location: left
     toc-depth: 3
     number-sections: true
     code-fold: true
     self-contained: true
     fig-cap-location: bottom
+    css: abiba_report.css
 execute:
   warning: false
   message: false
@@ -200,8 +202,6 @@ Findings show persistent, system-wide underperformance: 86.4% of station-days fa
 
 **Recommendation:** A targeted 10,000 bbl/day fleet expansion on Zone 1 alternative evacuation routes is associated with an expected recovery of approximately 5,602 bbl/day under current operating conditions. The uncertainty range and scenario bounds are reported in Technique 5 to support risk-aware implementation.
 
-*(Word count: ~190)*
-
 ---
 
 ## Professional Disclosure
@@ -209,7 +209,7 @@ Findings show persistent, system-wide underperformance: 86.4% of station-days fa
 **Job title:** Head, Alternative Crude Oil Evacuation
 **Organisation sector:** Upstream oil and gas operations — national crude production, zone-level throughput management, and evacuation logistics
 
-### Technique 1 — Exploratory Data Analysis
+### Exploratory Data Analysis
 
 As Head of Alternative Crude Oil Evacuation, every working day begins with a review of the previous day's production figures: did each flow station meet its `BUDGET` target, and what is the gap in `ACTUAL`? Before any statistical test can be run, I need to understand the distributional shape of that gap across 625 daily records spanning four flow stations (ALK, CC1, CC2, CC3) and two zones. Are shortfalls concentrated in certain stations or spread evenly? Are there extreme outlier days — caused by pipeline maintenance or force majeure — that would distort any zone-level comparison? EDA answers these questions first and ensures that every downstream test and model rests on verified, understood data rather than unexamined assumptions. This mirrors the operational health-check I conduct before presenting production performance to senior management.
 
@@ -217,7 +217,7 @@ As Head of Alternative Crude Oil Evacuation, every working day begins with a rev
 
 **Limitation:** EDA is descriptive only. A zone that visually appears to underperform may still fail to do so significantly once sample variance is accounted for. Formal tests are required before drawing operational conclusions.
 
-### Technique 2 — Data Visualization
+### Data Visualization
 
 Upstream operations leadership does not make decisions from tables of numbers. The briefings I prepare for management are built around time-series charts of daily `ACTUAL` vs `BUDGET` production, zone-level comparison charts, and capacity utilization trend lines drawn from `evacuation_capacity` and `evacuation_utilization`. The `DATE` field enables a full January–May 2026 timeline view, while `ZONE` and `FLOW_STATIONS` provide the categorical groupings needed for comparison. Visualization allows me to spot bottleneck periods — weeks where Zone 1 (CC2/CC3) and Zone 2 (ALK/CC1) diverge — in a format that a non-technical executive can act on immediately. These charts are directly reusable in production performance briefings.
 
@@ -225,7 +225,7 @@ Upstream operations leadership does not make decisions from tables of numbers. T
 
 **Limitation:** Visual patterns can appear more decisive than they are. A chart showing Zone 2 consistently below budget could be driven by one outlier period. All visual findings are followed by formal hypothesis tests before policy action is recommended.
 
-### Technique 3 — Hypothesis Testing
+### Hypothesis Testing
 
 My organisation operates four flow stations across two zones, and a persistent management question is whether Zone 1 and Zone 2 perform statistically differently against their respective `BUDGET` targets, or whether the apparent difference is within normal operational variance. If the difference is statistically significant, that is a resource allocation issue: it justifies redirecting evacuation capacity or maintenance attention to the underperforming zone. If it is not significant, the variability is systemic and calls for a different intervention. A p-value and effect size turn what is currently an informal management opinion into a defensible, data-backed operational directive.
 
@@ -233,7 +233,7 @@ My organisation operates four flow stations across two zones, and a persistent m
 
 **Limitation:** After splitting by both `ZONE` and `FLOW_STATIONS`, some station-level subgroups may have fewer observations than ideal for high-power comparisons. Zone-level comparisons are adequately powered; station-level results are interpreted with explicit power caveats.
 
-### Technique 4 — Correlation Analysis
+### Correlation Analysis
 
 Before including `evacuation_capacity` and `evacuation_utilization` as predictors in regression, I need to establish whether they are actually related to production performance. My operational hypothesis is that low utilization relative to capacity should correlate with better production attainment. Correlation analysis on the merged daily dataset confirms or refutes this and reveals which evacuation variables are worth including as predictors. It also guards against multicollinearity. Given the confirmed non-normality of shortfall distributions (Shapiro-Wilk p < 0.05), Spearman rank correlation is the primary non-parametric measure; Pearson is reported alongside for direct comparison.
 
@@ -241,7 +241,7 @@ Before including `evacuation_capacity` and `evacuation_utilization` as predictor
 
 **Limitation:** Correlation measures linear (Pearson) or monotonic (Spearman) association only. The relationship between evacuation utilization and production attainment may be non-linear — utilization below 40% may have limited impact while utilization above 80% may sharply constrain output. This is explored visually before regression specification.
 
-### Technique 5 — Multiple Regression
+### Multiple Regression
 
 The commercial and strategic purpose of this analysis is a daily production attainment model: given a station's `BUDGET` target, its `ZONE`, its `evacuation_capacity`, and its `utilization_rate`, what `ACTUAL` production shortfall should be expected? A regression equation with `shortfall` as the outcome variable provides coefficient-level answers to the question every evacuation planning meeting asks: which factor, if improved by one unit, recovers the most daily barrels? Every coefficient in this model maps to a recoverable share of annual throughput targets.
 
@@ -356,7 +356,7 @@ display(prod_py.groupby(["ZONE", "FLOW_STATIONS"]).size().reset_index(name="coun
 
 ---
 
-## Technique 1 — Exploratory Data Analysis
+## Exploratory Data Analysis
 
 **Theory recap:** EDA (Tukey, 1977) is a philosophy of letting data guide analysis before imposing assumptions. Core tools include distributional summaries, outlier detection via the IQR method, and skewness/kurtosis statistics. Anscombe's Quartet (1973) demonstrates why summary statistics alone are insufficient: four datasets with identical means and standard deviations can have radically different visual structures. EDA mitigates this risk.
 
@@ -598,9 +598,21 @@ display(summary)
 
 **Interpretation:** The shortfall distribution is left-skewed, meaning underperformance days are both more frequent and more extreme than overperformance days. Across the full sample, 86.4% of station-days fall below budget — confirming systemic production pressure rather than isolated volatility. IQR-based outlier detection flags a meaningful share of records in each station as extreme low values; these are retained in all analyses as genuine operational shutdowns rather than data errors, but are noted as potential influence points in regression. The Anscombe demonstration above reinforces why this visual step is mandatory: identical summary moments can conceal very different data shapes. At station level, CC2 has the largest mean deficit (−2,837.63 bbl/day), while CC3 has the highest share of under-budget days (92.8%), indicating highly persistent reliability constraints. Zone-level averages show sustained deficits (Zone 1: −2,198 bbl/day; Zone 2: −1,830 bbl/day). This pattern indicates chronic throughput pressure concentrated in specific assets; corrective action should prioritise persistent bottlenecks (CC2 and CC3) rather than one-off incident response.
 
+:::{.callout-note collapse="true"}
+## Analytical Notes — Exploratory Data Analysis
+
+**What this technique does:** Describes the distribution shape, central tendency, spread, and outlier pattern of daily production shortfall across stations and zones.
+
+**Why it was selected here:** Data quality validation must precede inference. Without understanding the shape of the shortfall distribution, any downstream statistical conclusions rest on unverified ground.
+
+**Key assumption underpinning the result:** Extreme low values (near-zero actual production days) are genuine operational shutdown events, not data entry errors. They are retained in the analysis and flagged as potential influence points in regression.
+
+**Management action this supports:** Prioritise CC2 and CC3 reliability remediation over incident-by-incident response; persistent distributional deficits indicate structural constraints, not random variation.
+:::
+
 ---
 
-## Technique 2 — Data Visualization
+## Data Visualization
 
 **Theory recap:** Tufte's (1983) principle of maximising the data-ink ratio and Wilkinson's (2005) Grammar of Graphics — implemented in R as `ggplot2` and in Python as `seaborn`/`matplotlib` — guide chart construction. Each chart type should be selected to match the data structure: time series for trends, heat maps for cross-tabulated magnitudes, scatter plots for bivariate relationships, box plots for distributional comparisons.
 
@@ -839,9 +851,21 @@ print(f"p-value: {trend_mod.pvalues['month_idx']:.4f} | R-squared: {trend_mod.rs
 4. **Scatter plot (capacity vs shortfall):** The negative fitted lines confirm that higher evacuation capacity is associated with smaller deficits across both zones — the key bivariate relationship that regression will subsequently quantify and control.
 5. **Monthly trend line:** The mean shortfall deepens progressively each month in both zones, and the Jan-Apr formal trend test confirms the deterioration is statistically directional rather than purely visual. This supports the interpretation of a structural performance decline consistent with ageing well productivity or deferred maintenance.
 
+:::{.callout-note collapse="true"}
+## Analytical Notes — Data Visualization
+
+**What this technique does:** Shows temporal deterioration of shortfall over time, station-level concentration of underperformance, and the bivariate relationship between evacuation capacity and production deficit.
+
+**Why it was selected here:** Required to translate raw numbers into the format used in board briefings, and to expose patterns (trend direction, spatial concentration) that summary statistics alone cannot communicate.
+
+**Key assumption underpinning the result:** Visual trend patterns are confirmed by a formal statistical test (Jan–Apr linear trend regression). Charts are supplementary to, not substitutes for, formal inference.
+
+**Management action this supports:** Track monthly shortfall trajectory as a formal KPI; the worsening trend is structural, not seasonal, and warrants sustained intervention rather than incident-by-incident response.
+:::
+
 ---
 
-## Technique 3 — Hypothesis Testing
+## Hypothesis Testing
 
 **Theory recap:** The one-way ANOVA tests whether group means differ more than chance variation would predict (Fisher, 1921). Its F-statistic is the ratio of between-group variance to within-group variance. Assumptions include normality within groups and homogeneity of variance. When normality is violated (as confirmed by Shapiro-Wilk), the Kruskal-Wallis H-test — a non-parametric rank-based equivalent — is the appropriate primary reference. Effect size (η²) contextualises statistical significance: a small p-value in a large sample can reflect a trivially small real difference.
 
@@ -978,9 +1002,21 @@ At station level, the ANOVA is strongly significant and robust given larger grou
 
 To reconcile the apparent zone contradiction: the ANOVA zone p-value (0.044) is sensitive to violated normality, while the Kruskal-Wallis result (0.195) is robust under the observed distribution shape and is therefore treated as primary for zone-level inference. Regression zone coefficients are interpreted conditionally (holding capacity/utilization constant), not as standalone proof of unconditional zone differences.
 
+:::{.callout-note collapse="true"}
+## Analytical Notes — Hypothesis Testing
+
+**What this technique does:** Formally tests whether production shortfall differences between zones and between stations are systematic or explainable by chance variation.
+
+**Why it was selected here:** Converts an operational observation into a defensible basis for resource allocation. Parametric (ANOVA) and non-parametric (Kruskal-Wallis) results are both reported; the rank-based test is treated as primary given confirmed non-normality.
+
+**Key assumption underpinning the result:** Kruskal-Wallis requires only that groups have similarly shaped distributions; it does not require normality. The ANOVA p-value for zones is sensitive to the normality violation and is not used as the primary zone-level result.
+
+**Management action this supports:** Allocate resources by station-level evidence first (CC2 and CC3 are statistically distinct); zone-level differences are directionally suggestive only and should not drive standalone resource decisions.
+:::
+
 ---
 
-## Technique 4 — Correlation Analysis
+## Correlation Analysis
 
 **Theory recap:** Pearson's r measures the strength and direction of a *linear* relationship between two continuous variables (range: −1 to +1). Spearman's ρ is the rank-based equivalent — appropriate when normality is violated (as confirmed here) or when relationships may be monotonic but non-linear. Kendall's τ is a slower-converging but more robust rank correlation. Partial correlation removes the shared influence of a third variable to estimate the unique association between two variables of interest (Pearson, 1900).
 
@@ -1101,9 +1137,21 @@ display(compare_df.round(4))
 
 **Note on Pearson, Spearman, and Kendall:** Given confirmed non-normality, rank-based measures are preferred as primary references. Spearman and Kendall both align with Pearson on sign and relative strength, increasing confidence that the capacity-shortfall relationship is not an artifact of one metric choice.
 
+:::{.callout-note collapse="true"}
+## Analytical Notes — Correlation Analysis
+
+**What this technique does:** Measures the strength and direction of association between evacuation capacity, utilization rate, and production shortfall. Reports Pearson, Spearman, and Kendall coefficients; partial correlation controls for budget-scale confounding.
+
+**Why it was selected here:** Screening for realistic actionable levers before regression reduces the risk of including spurious predictors. Given confirmed non-normality, rank-based measures (Spearman, Kendall) are the primary references; Pearson is reported for comparability.
+
+**Key assumption underpinning the result:** Correlation is associational, not causal. The capacity–shortfall relationship may reflect shared operational conditions rather than a direct throughput effect.
+
+**Management action this supports:** Treat evacuation capacity as a high-priority investigation target; interpret the direction with confidence but the magnitude with caution on causality pending a controlled operational test.
+:::
+
 ---
 
-## Technique 5 — Multiple Regression
+## Multiple Regression
 
 **Theory recap:** Ordinary Least Squares (OLS) regression estimates the linear combination of predictors that minimises the sum of squared residuals. Key assumptions: linearity, independence of errors, homoscedasticity, approximate normality of residuals, and no severe multicollinearity. Violation of these assumptions affects the reliability of coefficient estimates and their standard errors. Diagnostics include residual plots (linearity, homoscedasticity), Q-Q plots (normality), Cook's distance (influential observations), Variance Inflation Factors (multicollinearity), and the Durbin-Watson statistic (autocorrelation).
 
@@ -1395,6 +1443,18 @@ The five analyses form a coherent, mutually reinforcing story about OML 18 crude
 
 7. **Causal attribution:** Correlation and regression establish association, not causation. A natural experiment — for example, comparing production attainment in periods before and after a capacity expansion — would be required to establish a causal claim for the coefficient interpretation.
 
+:::{.callout-note collapse="true"}
+## Analytical Notes — Multiple Regression
+
+**What this technique does:** Quantifies the independent conditional contribution of zone, evacuation capacity, and utilization to daily production shortfall. Newey-West HAC robust standard errors are compared against OLS. A train-test split (Jan–Mar train / Apr–May test) provides an out-of-sample validation check, and a scenario table bounds the 5k/10k/15k bbl/day capacity expansion projections.
+
+**Why it was selected here:** Converts the exploratory findings into a forecastable impact figure grounded in held-out validation rather than in-sample fit alone, and quantifies uncertainty so that the 5,602 bbl/day projection is accompanied by defensible upper and lower bounds.
+
+**Key assumption underpinning the result:** OLS linearity and independence assumptions are partially violated (autocorrelation detected; HAC standard errors applied to address this). R² of 0.29 leaves 71% of variance unexplained; the model is suitable for directional guidance and scenario bounding, not precise point forecasting.
+
+**Management action this supports:** Pilot a staged capacity expansion and monitor realised shortfall against the scenario bounds reported in the uncertainty table; treat point estimates as conditional projections, not guarantees.
+:::
+
 ---
 
 ## Executive Dashboard (Management View)
@@ -1503,34 +1563,19 @@ display(pd.DataFrame(rows))
 
 ---
 
-## Section C — Defence Readiness Appendix
+## GitHub Repository
 
-The defence evaluates how clearly each technique can be explained under pressure. The four universal prompts are answered below per technique: what it does, why it was chosen, key assumption, and immediate management action.
+Reproduction materials for this analysis — including the Quarto source document, R and Python environment specs, and a data access note  are maintained in the repository below.
 
-| Technique | What It Does | Why Chosen Here | Key Assumption to Defend | One-Line Management Action |
-|---|---|---|---|---|
-| EDA | Describes distribution shape, outliers, and station patterns | Needed to validate data quality before inference | Extreme low values are operational events, not input errors | Prioritize CC2/CC3 reliability remediation over incident-by-incident response |
-| Visualization | Shows temporal deterioration and station concentration | Required for executive communication and trend diagnosis | Visual trends should be supported by tests (Jan-Apr trend test included) | Track monthly shortfall trajectory as a formal KPI |
-| Hypothesis Testing | Tests whether differences are random vs systematic | Needed for defensible resource allocation decisions | Non-normality shifts primary inference to Kruskal-Wallis | Allocate by station-level evidence first, not zone average alone |
-| Correlation | Measures association strength and direction | Screens realistic levers before regression | Correlation is associational, not causal | Treat capacity as a high-priority lever with caution on causality |
-| Regression | Quantifies conditional contribution of each predictor | Converts analytics into forecastable operational impact | OLS assumptions; robust SE and validation reduce but do not remove risk | Pilot staged capacity expansion and monitor realized vs forecast band |
+**Repository URL:** `https://github.com/<abiba-username>/oml18-capstone-abiba`  
 
----
+**Repository structure:**
 
-## Bonus +5 — GitHub Repository Placeholder
-
-- **Repository URL placeholder:** `https://github.com/<your-username>/oml18-capstone-abiba`
-- **Minimum publish-ready structure:**
-  - `README.md` (project objective, dataset dictionary, run steps)
-  - `abiba_capstone_v2.qmd`
-  - `data/` (or redacted sample + data access note)
-  - `requirements.txt` and R package list
-- **README checklist (for bonus audit):**
-  1. Business question and context
-  2. Exact render command
-  3. Key outputs expected after render
-  4. Data access/governance caveat
-  5. Contact or provenance statement
+- `code/` — Quarto `.qmd` source document
+- `data/` — data governance note; raw files available on organisational data-governance approval
+- `notes/` — working notes and exploratory scratch files
+- `outputs/` — rendered HTML report
+- `README.md` — project objective, dataset dictionary, render steps, and data access statement
 
 ---
 
@@ -1571,4 +1616,4 @@ Badmus, A. (2026). *OML 18 daily production and alternative evacuation dataset �
 
 ## Appendix: AI Usage Statement
 
-GitHub Copilot (Microsoft) and ChatGPT (OpenAI) were used to accelerate structure design, code templating, and review of statistical workflow sequencing in this document. All dataset-specific cleaning rules (the zero/blank `ACTUAL` imputation logic, the 150% capacity buffer threshold derivation), test selection decisions (the choice of Kruskal-Wallis as the primary zone test over ANOVA given confirmed non-normality), threshold definitions, coefficient interpretation, and operational recommendations were independently validated by the author against the actual outputs generated from internal production and evacuation data. The partial correlation specification and the `gg_corr_tile` heatmap replacement function were written by the author to resolve a system dependency issue without degrading analytical quality. Final conclusions and business actions — including the 5,602 bbl/day recovery projection and the Zone 1 fleet-expansion recommendation — reflect the author's professional judgement and accountability as Head of Alternative Crude Oil Evacuation.
+GitHub Copilot and ChatGPT were used as drafting and coding support tools during the preparation of this capstone. The analytical workflow, data cleaning decisions, statistical method selection, interpretation of results, and operational recommendations were independently checked by Abiba Badmus against the original production and evacuation records and the outputs generated from the analysis. Final responsibility for the analysis, judgement, and recommendations remains with the author.

@@ -1,0 +1,33 @@
+# R
+.Rhistory
+.RData
+.Rproj.user/
+*.Rproj
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+
+# Quarto render artefacts
+/.quarto/
+*_files/
+*_cache/
+
+# Data files (commercially sensitive — excluded from repo)
+data/*.csv
+data/*.xlsx
+data/*.xls
+data/*.parquet
+
+# Rendered outputs (large; regenerate with quarto render)
+outputs/*.html
+outputs/*.pdf
+
+# OS
+.DS_Store
+Thumbs.db
