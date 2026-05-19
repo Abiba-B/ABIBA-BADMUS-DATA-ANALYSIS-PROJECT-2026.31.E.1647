@@ -36,12 +36,9 @@ pkgs_core <- c("readr", "dplyr", "tidyr", "tibble", "purrr", "forcats",
                "sandwich", "lmtest")
 invisible(lapply(pkgs_core, library, character.only = TRUE))
 
-# kableExtra: use shim if system dependency unavailable
-if (!requireNamespace("kableExtra", quietly = TRUE)) {
-  kable_styling <- function(x, ...) x
-} else {
-  library(kableExtra)
-}
+# Table styling shim for environments where optional HTML styling packages
+# are unavailable during deployment scans.
+kable_styling <- function(x, ...) x
 
 knitr::opts_chunk$set(fig.width = 9, fig.height = 5, dpi = 150)
 
@@ -200,7 +197,7 @@ This analysis identifies where daily crude oil production losses are occurring a
 
 Findings show persistent, system-wide underperformance: 86.4% of station-days fall below budget. Zone differences are directionally present but not statistically robust (Kruskal-Wallis p = 0.195); station-level differences, however, are highly significant (ANOVA F = 32.6, p < 0.001), with CC2 the deepest underperformer. Correlation and regression both identify evacuation capacity as the primary modifiable lever (r = −0.36 with shortfall; regression coefficient = −0.56 bbl/day shortfall per 1 bbl/day capacity, p < 0.001). The model explains 29% of shortfall variance, so recommendations are expressed as conditional operational projections, not causal guarantees.
 
-**Recommendation:** A targeted 10,000 bbl/day fleet expansion on Zone 1 alternative evacuation routes is associated with an expected recovery of approximately 5,602 bbl/day under current operating conditions. The uncertainty range and scenario bounds are reported in Technique 5 to support risk-aware implementation.
+**Recommendation:** A targeted 10,000 bbl/day fleet expansion on Zone 1 alternative evacuation routes is associated with an expected recovery of approximately 5,602 bbl/day under current operating conditions. The uncertainty range and scenario bounds are reported in the regression analysis to support risk-aware implementation.
 
 ---
 
@@ -599,7 +596,7 @@ display(summary)
 **Interpretation:** The shortfall distribution is left-skewed, meaning underperformance days are both more frequent and more extreme than overperformance days. Across the full sample, 86.4% of station-days fall below budget — confirming systemic production pressure rather than isolated volatility. IQR-based outlier detection flags a meaningful share of records in each station as extreme low values; these are retained in all analyses as genuine operational shutdowns rather than data errors, but are noted as potential influence points in regression. The Anscombe demonstration above reinforces why this visual step is mandatory: identical summary moments can conceal very different data shapes. At station level, CC2 has the largest mean deficit (−2,837.63 bbl/day), while CC3 has the highest share of under-budget days (92.8%), indicating highly persistent reliability constraints. Zone-level averages show sustained deficits (Zone 1: −2,198 bbl/day; Zone 2: −1,830 bbl/day). This pattern indicates chronic throughput pressure concentrated in specific assets; corrective action should prioritise persistent bottlenecks (CC2 and CC3) rather than one-off incident response.
 
 :::{.callout-note collapse="true"}
-## Analytical Notes — Exploratory Data Analysis
+## Notes — Exploratory Data Analysis
 
 **What this technique does:** Describes the distribution shape, central tendency, spread, and outlier pattern of daily production shortfall across stations and zones.
 
@@ -852,7 +849,7 @@ print(f"p-value: {trend_mod.pvalues['month_idx']:.4f} | R-squared: {trend_mod.rs
 5. **Monthly trend line:** The mean shortfall deepens progressively each month in both zones, and the Jan-Apr formal trend test confirms the deterioration is statistically directional rather than purely visual. This supports the interpretation of a structural performance decline consistent with ageing well productivity or deferred maintenance.
 
 :::{.callout-note collapse="true"}
-## Analytical Notes — Data Visualization
+## Notes — Data Visualization
 
 **What this technique does:** Shows temporal deterioration of shortfall over time, station-level concentration of underperformance, and the bivariate relationship between evacuation capacity and production deficit.
 
@@ -1003,7 +1000,7 @@ At station level, the ANOVA is strongly significant and robust given larger grou
 To reconcile the apparent zone contradiction: the ANOVA zone p-value (0.044) is sensitive to violated normality, while the Kruskal-Wallis result (0.195) is robust under the observed distribution shape and is therefore treated as primary for zone-level inference. Regression zone coefficients are interpreted conditionally (holding capacity/utilization constant), not as standalone proof of unconditional zone differences.
 
 :::{.callout-note collapse="true"}
-## Analytical Notes — Hypothesis Testing
+## Notes — Hypothesis Testing
 
 **What this technique does:** Formally tests whether production shortfall differences between zones and between stations are systematic or explainable by chance variation.
 
@@ -1138,7 +1135,7 @@ display(compare_df.round(4))
 **Note on Pearson, Spearman, and Kendall:** Given confirmed non-normality, rank-based measures are preferred as primary references. Spearman and Kendall both align with Pearson on sign and relative strength, increasing confidence that the capacity-shortfall relationship is not an artifact of one metric choice.
 
 :::{.callout-note collapse="true"}
-## Analytical Notes — Correlation Analysis
+## Notes — Correlation Analysis
 
 **What this technique does:** Measures the strength and direction of association between evacuation capacity, utilization rate, and production shortfall. Reports Pearson, Spearman, and Kendall coefficients; partial correlation controls for budget-scale confounding.
 
@@ -1444,7 +1441,7 @@ The five analyses form a coherent, mutually reinforcing story about OML 18 crude
 7. **Causal attribution:** Correlation and regression establish association, not causation. A natural experiment — for example, comparing production attainment in periods before and after a capacity expansion — would be required to establish a causal claim for the coefficient interpretation.
 
 :::{.callout-note collapse="true"}
-## Analytical Notes — Multiple Regression
+## Notes — Multiple Regression
 
 **What this technique does:** Quantifies the independent conditional contribution of zone, evacuation capacity, and utilization to daily production shortfall. Newey-West HAC robust standard errors are compared against OLS. A train-test split (Jan–Mar train / Apr–May test) provides an out-of-sample validation check, and a scenario table bounds the 5k/10k/15k bbl/day capacity expansion projections.
 
