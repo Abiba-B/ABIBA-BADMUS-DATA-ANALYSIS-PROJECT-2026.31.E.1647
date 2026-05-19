@@ -311,6 +311,27 @@ p2 <- ggplot(prod_r, aes(x = FLOW_STATIONS, y = shortfall, fill = ZONE)) +
 p1 / p2
 ```
 
+```{r eda-skewkurt-r}
+# Skewness and kurtosis of production shortfall — required distributional statistics
+sk_fn <- function(x) {
+  x <- x[!is.na(x)]; n <- length(x); m <- mean(x); s <- sd(x)
+  sum((x - m)^3) / (n * s^3)
+}
+kt_fn <- function(x) {
+  x <- x[!is.na(x)]; n <- length(x); m <- mean(x); s <- sd(x)
+  sum((x - m)^4) / (n * s^4) - 3  # excess kurtosis
+}
+sk <- sk_fn(prod_r$shortfall)
+kt <- kt_fn(prod_r$shortfall)
+cat(sprintf("Production shortfall — Skewness: %.3f | Excess Kurtosis: %.3f\n", sk, kt))
+cat(ifelse(sk < -0.5,
+  "Left-skewed: underperformance days are more extreme and frequent than overperformance days.\n",
+  ifelse(sk > 0.5, "Right-skewed distribution.\n", "Approximately symmetric distribution.\n")))
+cat(ifelse(kt > 1,
+  "Leptokurtic (heavy tails): extreme shortfall days are more frequent than normal, consistent with maintenance events and force majeure.\n",
+  "Near-normal or platykurtic tails.\n"))
+```
+
 ```{r eda-summary-r}
 # Summary statistics by zone and station
 prod_r |>
@@ -358,6 +379,18 @@ summary = prod_py.groupby(["ZONE", "FLOW_STATIONS"]).agg(
     pct_days_under=("shortfall", lambda x: (x < 0).mean() * 100)
 ).round(1).reset_index()
 display(summary)
+```
+
+```{python eda-skewkurt-py}
+from scipy.stats import skew, kurtosis as sp_kurtosis
+
+sk_val = skew(prod_py["shortfall"].dropna())
+kt_val = sp_kurtosis(prod_py["shortfall"].dropna())  # excess kurtosis by default
+print(f"Production shortfall — Skewness: {sk_val:.3f} | Excess Kurtosis: {kt_val:.3f}")
+print("Left-skewed: underperformance days dominate." if sk_val < -0.5 else
+      ("Right-skewed distribution." if sk_val > 0.5 else "Approximately symmetric distribution."))
+print("Leptokurtic (heavy tails — extreme shortfall days more frequent than normal)." if kt_val > 1
+      else "Near-normal or platykurtic tails.")
 ```
 
 :::
@@ -718,6 +751,30 @@ plot(model, which = 1:4, pch = 16, cex = 0.6)
 par(mfrow = c(1, 1))
 ```
 
+```{r reg-assumptions-r}
+# ── Variance Inflation Factors — manual, no car package required ──────────────
+X_mat <- model.matrix(model)[, -1]  # drop intercept column
+vif_vals <- sapply(seq_len(ncol(X_mat)), function(i) {
+  r2_i <- summary(lm(X_mat[, i] ~ X_mat[, -i]))$r.squared
+  1 / (1 - r2_i)
+})
+names(vif_vals) <- colnames(X_mat)
+cat("=== Variance Inflation Factors (VIF) ===\n")
+print(round(vif_vals, 3))
+cat("Note: VIF > 5 = problematic multicollinearity; > 10 = severe\n\n")
+
+# ── Durbin-Watson statistic — direct computation ───────────────────────────────
+resids <- residuals(model)
+dw_stat <- sum(diff(resids)^2) / sum(resids^2)
+cat(sprintf("=== Durbin-Watson Statistic: %.4f ===\n", dw_stat))
+cat("Reference: DW ≈ 2 = no autocorrelation | DW < 1.5 = positive autocorrelation (common in daily data)\n")
+cat(ifelse(dw_stat < 1.5,
+  "CAUTION: Positive autocorrelation indicated — OLS standard errors may be underestimated.\n",
+  ifelse(dw_stat > 2.5,
+  "CAUTION: Negative autocorrelation indicated.\n",
+  "No strong autocorrelation indicated at this threshold.\n")))
+```
+
 ## Python
 
 ```{python reg-py}
@@ -759,6 +816,32 @@ plt.show()
 print(f"\nR-squared: {model_py.rsquared:.4f}")
 print(f"Adj. R-squared: {model_py.rsquared_adj:.4f}")
 print(f"F-statistic p-value: {model_py.f_pvalue:.6f}")
+```
+
+```{python reg-assumptions-py}
+from statsmodels.stats.outliers_influence import variance_inflation_factor
+from statsmodels.stats.stattools import durbin_watson
+
+# Variance Inflation Factors
+X_vif = df_reg[["evacuation_capacity", "utilization_rate"]].dropna().reset_index(drop=True)
+vif_df = pd.DataFrame({
+    "Feature": X_vif.columns,
+    "VIF": [round(variance_inflation_factor(X_vif.values, i), 3) for i in range(X_vif.shape[1])]
+})
+print("=== Variance Inflation Factors (VIF) ===")
+print(vif_df.to_string(index=False))
+print("Note: VIF > 5 = problematic multicollinearity; > 10 = severe\n")
+
+# Durbin-Watson autocorrelation test
+dw_stat = durbin_watson(model_py.resid)
+print(f"=== Durbin-Watson Statistic: {dw_stat:.4f} ===")
+print("Reference: DW ≈ 2 = no autocorrelation | DW < 1.5 = positive autocorrelation")
+if dw_stat < 1.5:
+    print("CAUTION: Positive autocorrelation — OLS standard errors may be underestimated.")
+elif dw_stat > 2.5:
+    print("CAUTION: Negative autocorrelation detected.")
+else:
+    print("No strong autocorrelation indicated at this threshold.")
 ```
 
 :::
