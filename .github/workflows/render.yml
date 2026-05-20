@@ -1,0 +1,77 @@
+name: Render Abiba Capstone
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: "pip"
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Set up R
+        uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: "4.3"
+
+      - name: Install R dependencies
+        shell: Rscript {0}
+        run: |
+          install.packages(c(
+            "readr", "dplyr", "tidyr", "tibble", "purrr", "forcats",
+            "ggplot2", "lubridate", "scales", "patchwork", "broom",
+            "knitr", "sandwich", "lmtest", "reticulate"
+          ), repos = "https://cloud.r-project.org")
+
+      - name: Set up Quarto
+        uses: quarto-dev/quarto-actions/setup@v2
+
+      - name: Check required local data files
+        id: data_check
+        run: |
+          missing=0
+          if [ ! -f "data/daily production report.csv" ]; then
+            echo "::warning::Missing data/daily production report.csv"
+            missing=1
+          fi
+          if [ ! -f "data/evacuation_report.csv" ]; then
+            echo "::warning::Missing data/evacuation_report.csv"
+            missing=1
+          fi
+          echo "missing=$missing" >> "$GITHUB_OUTPUT"
+
+      - name: Render Quarto document
+        if: steps.data_check.outputs.missing == '0'
+        env:
+          QUARTO_PYTHON: ${{ env.pythonLocation }}/bin/python
+        run: quarto render abiba_capstone_v2.qmd
+
+      - name: Upload rendered HTML artifact
+        if: steps.data_check.outputs.missing == '0'
+        uses: actions/upload-artifact@v4
+        with:
+          name: abiba-capstone-html
+          path: abiba_capstone_v2.html
+          retention-days: 30
+
+      - name: Skip note when data is missing
+        if: steps.data_check.outputs.missing == '1'
+        run: |
+          echo "Render skipped because raw data files are intentionally excluded from GitHub."

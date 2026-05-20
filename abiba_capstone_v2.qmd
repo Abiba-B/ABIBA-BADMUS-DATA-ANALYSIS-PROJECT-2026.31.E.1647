@@ -270,7 +270,7 @@ The commercial and strategic purpose of this analysis is a daily production atta
 - **Extraction governance:** The extraction event, approver identity, and approval reference are logged in the internal operations audit trail maintained by the line function; only aggregate operational fields were exported for academic use.
 - **Privacy and confidentiality:** No direct personal identifiers or employee-level fields are present. Flow-station and zone labels are operational asset codes; absolute sensitive commercial values are not disclosed outside approved internal channels.
 - **Sampling frame rationale:** This is a full operational census of active assets over the covered period (Jan 1-May 5, 2026), not a sampled subset. For zone-level comparisons, the effective group sizes are sufficient for stable inference on medium effects, while the observed zone effect (eta-squared = 0.007) is substantively negligible regardless of statistical significance under alternative assumptions.
-- **Defence-ready caveat:** Because May covers only 5 days, formal trend inference is reported both with and without partial-May observations to avoid overstating deterioration.
+- **Partial-Period Bias:** Because May covers only 5 days, formal trend inference is reported both with and without partial-May observations to avoid overstating deterioration.
 
 ---
 
@@ -1548,7 +1548,7 @@ kable(pkg_meta, caption = "R package versions used in this report") |>
 ```{python pkg-citations-py}
 import importlib
 
-mods = ["pandas", "numpy", "matplotlib", "seaborn", "scipy", "statsmodels"]
+mods = ["pandas", "numpy", "matplotlib", "seaborn", "scipy", "statsmodels", "IPython"]
 rows = []
 for m in mods:
     module = importlib.import_module(m)
@@ -1564,7 +1564,7 @@ display(pd.DataFrame(rows))
 
 Reproduction materials for this analysis — including the Quarto source document, R and Python environment specs, and a data access note  are maintained in the repository below.
 
-**Repository URL:** `https://github.com/<abiba-username>/oml18-capstone-abiba`  
+**Repository URL:** https://github.com/Abiba-B/ABIBA-BADMUS-DATA-ANALYSIS-PROJECT-2026.31.E.1647
 
 **Repository structure:**
 
@@ -1582,11 +1582,17 @@ Adi, B. (2026). *AI-powered business analytics: A practical textbook for data-dr
 
 Allaire, J. J., Teague, C., Scheidegger, C., Xie, Y., & Dervieux, C. (2022). *Quarto* (Version 1.x) [Computer software]. https://doi.org/10.5281/zenodo.5960048
 
+Anscombe, F. J. (1973). Graphs in statistical analysis. *The American Statistician*, *27*(1), 17–21. https://doi.org/10.1080/00031305.1973.10478966
+
+Fisher, R. A. (1921). Studies in crop variation. I. An examination of the yield of dressed grain from Broadbalk. *Journal of Agricultural Science*, *11*(2), 107–135. https://doi.org/10.1017/S0021859600003750
+
 Grolemund, G., & Wickham, H. (2011). Dates and times made easy with lubridate. *Journal of Statistical Software*, *40*(3), 1–25. https://doi.org/10.18637/jss.v040.i03
 
 Hunter, J. D. (2007). Matplotlib: A 2D graphics environment. *Computing in Science & Engineering*, *9*(3), 90–95. https://doi.org/10.1109/MCSE.2007.55
 
 McKinney, W. (2010). Data structures for statistical computing in Python. In *Proceedings of the 9th Python in Science Conference* (pp. 56–61). https://doi.org/10.25080/Majora-92bf1922-00a
+
+Pearson, K. (1900). On the criterion that a given system of deviations from the probable in the case of a correlated system of variables is such that it can be reasonably supposed to have arisen from random sampling. *The London, Edinburgh, and Dublin Philosophical Magazine and Journal of Science*, *50*(302), 157–175. https://doi.org/10.1080/14786440009463897
 
 Pedersen, T. L. (2024). *patchwork: The composer of plots* (R package version 1.x). https://CRAN.R-project.org/package=patchwork
 
@@ -1594,7 +1600,11 @@ R Core Team. (2024). *R: A language and environment for statistical computing* (
 
 Seabold, S., & Perktold, J. (2010). statsmodels: Econometric and statistical modeling with Python. In *Proceedings of the 9th Python in Science Conference* (pp. 92–96). https://doi.org/10.25080/Majora-92bf1922-011
 
+Tukey, J. W. (1977). *Exploratory data analysis*. Addison-Wesley.
+
 Van Rossum, G., & Drake, F. L. (2009). *Python 3 reference manual*. CreateSpace.
+
+Virtanen, P., Gommers, R., Oliphant, T. E., Haberland, M., Reddy, T., Cournapeau, D., Burovski, E., Peterson, P., Weckesser, W., Bright, J., van der Walt, S. J., Brett, M., Wilson, J., Millman, K. J., Mayorov, N., Nelson, A. R. J., Jones, E., Kern, R., Larson, E., … SciPy 1.0 Contributors. (2020). SciPy 1.0: Fundamental algorithms for scientific computing in Python. *Nature Methods*, *17*, 261–272. https://doi.org/10.1038/s41592-019-0686-2
 
 Waskom, M. L. (2021). seaborn: Statistical data visualization. *Journal of Open Source Software*, *6*(60), 3021. https://doi.org/10.21105/joss.03021
 
@@ -1603,6 +1613,8 @@ Wickham, H. (2016). *ggplot2: Elegant graphics for data analysis*. Springer. htt
 Wickham, H., Averick, M., Bryan, J., Chang, W., McGowan, L., François, R., Grolemund, G., Hayes, A., Henry, L., Hester, J., Kuhn, M., Pedersen, T. L., Miller, E., Bache, S. M., Müller, K., Ooms, J., Robinson, D., Seidel, D. P., Spinu, V., … Yutani, H. (2019). Welcome to the tidyverse. *Journal of Open Source Software*, *4*(43), 1686. https://doi.org/10.21105/joss.01686
 
 Wickham, H., & Bryan, J. (2024). *readr: Read rectangular text data* (R package version 2.x). https://CRAN.R-project.org/package=readr
+
+Wilkinson, L. (2005). *The grammar of graphics* (2nd ed.). Springer. https://doi.org/10.1007/0-387-28695-0
 
 Xie, Y. (2024). *knitr: A general-purpose package for dynamic report generation in R* (R package version 1.x). https://yihui.org/knitr/
 
